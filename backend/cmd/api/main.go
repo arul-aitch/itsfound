@@ -13,11 +13,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/arul-aitch/itsfound/backend/internal/config"
 	"github.com/arul-aitch/itsfound/backend/internal/handler"
+	"github.com/arul-aitch/itsfound/backend/internal/middleware"
 	"github.com/arul-aitch/itsfound/backend/internal/repository"
 	"github.com/arul-aitch/itsfound/backend/internal/service"
 	"github.com/arul-aitch/itsfound/backend/pkg/jwtx"
@@ -57,8 +58,8 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
 	r.Use(corsMiddleware)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +79,8 @@ func main() {
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)
+
+		r.With(middleware.JWTAuth(cfg.JWTSecret)).Get("/auth/me", authHandler.Me)
 	})
 
 	server := &http.Server{

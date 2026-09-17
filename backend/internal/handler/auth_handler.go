@@ -5,7 +5,9 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/arul-aitch/itsfound/backend/internal/middleware"
 	"github.com/arul-aitch/itsfound/backend/internal/model"
+	"github.com/arul-aitch/itsfound/backend/internal/repository"
 	"github.com/arul-aitch/itsfound/backend/internal/service"
 )
 
@@ -79,6 +81,28 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
+		return
+	}
+
+	user, err := h.svc.Me(r.Context(), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "user not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		}
+
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

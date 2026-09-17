@@ -11,6 +11,7 @@ import (
 	"github.com/arul-aitch/itsfound/backend/internal/repository"
 	"github.com/arul-aitch/itsfound/backend/pkg/hasher"
 	"github.com/arul-aitch/itsfound/backend/pkg/jwtx"
+	"github.com/google/uuid"
 )
 
 const minPasswordLength = 8
@@ -24,6 +25,7 @@ var (
 type AuthService interface {
 	Register(ctx context.Context, req model.RegisterRequest) (*model.UserResponse, error)
 	Login(ctx context.Context, req model.LoginRequest) (*model.UserResponse, string, error)
+	Me(ctx context.Context, userID string) (*model.UserResponse, error)
 }
 
 type authService struct {
@@ -125,4 +127,27 @@ func (s *authService) Login(
 	response := user.ToResponse()
 
 	return &response, token, nil
+}
+
+func (s *authService) Me(
+	ctx context.Context,
+	userID string,
+) (*model.UserResponse, error) {
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("parse user id: %w", err)
+	}
+
+	user, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, repository.ErrNotFound
+		}
+
+		return nil, fmt.Errorf("find user by id: %w", err)
+	}
+
+	response := user.ToResponse()
+
+	return &response, nil
 }

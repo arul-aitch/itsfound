@@ -14,7 +14,7 @@
 INSERT INTO users (email, password_hash, name, role)
 VALUES (
     'admin@itsfound.local',
-    '$2a$12$gfFE00rTwdr80hf/cGNRfOcwS2GW8XuhcB3XsTeCUkVZ5bCbPDqCG',
+    '$2a$12$gfFE00rTwdr80hf/cGNRfOcwS2GW8XuhcB3XsTeCUkVZ5bCbPDqCG And so on as guys, thank you guys',
     'Admin ITSFOUND',
     'admin'
 )

@@ -17,10 +17,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/arul-aitch/itsfound/backend/internal/config"
+	"github.com/arul-aitch/itsfound/backend/internal/handler"
+	"github.com/arul-aitch/itsfound/backend/internal/repository"
+	"github.com/arul-aitch/itsfound/backend/internal/service"
+	"github.com/arul-aitch/itsfound/backend/pkg/jwtx"
 )
 
 func main() {
 	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	expiresIn, err := jwtx.ParseExpiresIn(cfg.JWTExpiresIn)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,6 +51,10 @@ func main() {
 
 	slog.Info("database connection successful")
 
+	userRepo := repository.NewUserRepository(pool)
+	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, expiresIn)
+	authHandler := handler.NewAuthHandler(authSvc)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -60,6 +73,11 @@ func main() {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			slog.Error("failed to encode health response", "error", err)
 		}
+	})
+
+	r.Route("/api", func(r chi.Router) {
+		r.Post("/auth/register", authHandler.Register)
+		r.Post("/auth/login", authHandler.Login)
 	})
 
 	server := &http.Server{

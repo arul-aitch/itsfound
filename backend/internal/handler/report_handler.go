@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/arul-aitch/itsfound/backend/internal/middleware"
 	"github.com/arul-aitch/itsfound/backend/internal/model"
@@ -69,7 +70,41 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ReportHandler) List(w http.ResponseWriter, r *http.Request) {
-	reports, err := h.svc.FindAll(r.Context())
+	query := r.URL.Query()
+
+	listQuery := model.ListReportsQuery{
+		Page:    0,
+		PerPage: 0,
+		Type:    query.Get("type"),
+		Status:  query.Get("status"),
+		Search:  query.Get("search"),
+	}
+
+	if value := query.Get("page"); value != "" {
+		if page, err := strconv.Atoi(value); err == nil {
+			listQuery.Page = page
+		}
+	}
+
+	if value := query.Get("per_page"); value != "" {
+		if perPage, err := strconv.Atoi(value); err == nil {
+			listQuery.PerPage = perPage
+		}
+	}
+
+	if value := query.Get("category_id"); value != "" {
+		if categoryID, err := strconv.Atoi(value); err == nil {
+			listQuery.CategoryID = &categoryID
+		}
+	}
+
+	if value := query.Get("location_id"); value != "" {
+		if locationID, err := strconv.Atoi(value); err == nil {
+			listQuery.LocationID = &locationID
+		}
+	}
+
+	reports, err := h.svc.List(r.Context(), listQuery)
 	if err != nil {
 		writeError(
 			w,
@@ -86,7 +121,7 @@ func (h *ReportHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	report, err := h.svc.FindByID(r.Context(), id)
+	report, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportValidation):
@@ -125,6 +160,11 @@ func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	role, ok := middleware.RoleFromContext(r.Context())
+	if !ok {
+		role = ""
+	}
+
 	id := chi.URLParam(r, "id")
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -141,7 +181,13 @@ func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	report, err := h.svc.Update(r.Context(), userID, id, req)
+	report, err := h.svc.Update(
+		r.Context(),
+		userID,
+		role,
+		id,
+		req,
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportValidation):
@@ -187,9 +233,19 @@ func (h *ReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	role, ok := middleware.RoleFromContext(r.Context())
+	if !ok {
+		role = ""
+	}
+
 	id := chi.URLParam(r, "id")
 
-	err := h.svc.Delete(r.Context(), userID, id)
+	err := h.svc.Delete(
+		r.Context(),
+		userID,
+		role,
+		id,
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportValidation):

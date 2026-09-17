@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/arul-aitch/itsfound/backend/internal/model"
 	"github.com/arul-aitch/itsfound/backend/internal/repository"
@@ -18,11 +17,36 @@ var (
 )
 
 type ReportService interface {
-	Create(ctx context.Context, userID string, req model.CreateReportRequest) (*model.ReportResponse, error)
-	FindAll(ctx context.Context) ([]model.ReportResponse, error)
-	FindByID(ctx context.Context, id string) (*model.ReportResponse, error)
-	Update(ctx context.Context, userID string, id string, req model.UpdateReportRequest) (*model.ReportResponse, error)
-	Delete(ctx context.Context, userID string, id string) error
+	Create(
+		ctx context.Context,
+		userID string,
+		req model.CreateReportRequest,
+	) (*model.ReportResponse, error)
+
+	GetByID(
+		ctx context.Context,
+		id string,
+	) (*model.ReportResponse, error)
+
+	List(
+		ctx context.Context,
+		q model.ListReportsQuery,
+	) (*model.PaginatedReports, error)
+
+	Update(
+		ctx context.Context,
+		userID string,
+		role string,
+		id string,
+		req model.UpdateReportRequest,
+	) (*model.ReportResponse, error)
+
+	Delete(
+		ctx context.Context,
+		userID string,
+		role string,
+		id string,
+	) error
 }
 
 type reportService struct {
@@ -51,7 +75,6 @@ func (s *reportService) Create(
 		req.Description,
 		req.CategoryID,
 		req.LocationID,
-		req.OccurredAt,
 	); err != nil {
 		return nil, err
 	}
@@ -71,29 +94,25 @@ func (s *reportService) Create(
 		return nil, fmt.Errorf("create report: %w", err)
 	}
 
-	response := report.ToResponse()
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(
+		ctx,
+		report.ID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find created report detail: %w", err)
+	}
+
+	response := buildReportResponse(
+		report,
+		user,
+		categoryName,
+		locationName,
+	)
 
 	return &response, nil
 }
 
-func (s *reportService) FindAll(
-	ctx context.Context,
-) ([]model.ReportResponse, error) {
-	reports, err := s.repo.FindAll(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("find all reports: %w", err)
-	}
-
-	responses := make([]model.ReportResponse, 0, len(reports))
-
-	for _, report := range reports {
-		responses = append(responses, report.ToResponse())
-	}
-
-	return responses, nil
-}
-
-func (s *reportService) FindByID(
+func (s *reportService) GetByID(
 	ctx context.Context,
 	id string,
 ) (*model.ReportResponse, error) {
@@ -102,23 +121,95 @@ func (s *reportService) FindByID(
 		return nil, ErrReportValidation
 	}
 
-	report, err := s.repo.FindByID(ctx, reportID)
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(
+		ctx,
+		reportID,
+	)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, repository.ErrNotFound
 		}
 
-		return nil, fmt.Errorf("find report by id: %w", err)
+		return nil, fmt.Errorf("find report detail: %w", err)
 	}
 
-	response := report.ToResponse()
+	if report.Status == "removed" {
+		return nil, repository.ErrNotFound
+	}
+
+	response := buildReportResponse(
+		report,
+		user,
+		categoryName,
+		locationName,
+	)
 
 	return &response, nil
+}
+
+func (s *reportService) List(
+	ctx context.Context,
+	q model.ListReportsQuery,
+) (*model.PaginatedReports, error) {
+	if q.Page < 1 {
+		q.Page = 1
+	}
+
+	if q.PerPage < 1 {
+		q.PerPage = 20
+	}
+
+	if q.PerPage > 100 {
+		q.PerPage = 100
+	}
+
+	q.Type = strings.ToLower(strings.TrimSpace(q.Type))
+
+	if q.Type != "" && q.Type != "lost" && q.Type != "found" {
+		q.Type = ""
+	}
+
+	q.Search = strings.TrimSpace(q.Search)
+	q.Status = strings.TrimSpace(q.Status)
+
+	reports, users, categoryNames, locationNames, total, err := s.repo.List(
+		ctx,
+		q,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list reports: %w", err)
+	}
+
+	data := make([]model.ReportResponse, 0, len(reports))
+
+	for i, report := range reports {
+		response := buildReportResponse(
+			report,
+			users[i],
+			categoryNames[i],
+			locationNames[i],
+		)
+
+		data = append(data, response)
+	}
+
+	totalPages := (total + q.PerPage - 1) / q.PerPage
+
+	return &model.PaginatedReports{
+		Data: data,
+		Meta: model.PaginationMeta{
+			Page:       q.Page,
+			PerPage:    q.PerPage,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+	}, nil
 }
 
 func (s *reportService) Update(
 	ctx context.Context,
 	userID string,
+	role string,
 	id string,
 	req model.UpdateReportRequest,
 ) (*model.ReportResponse, error) {
@@ -138,7 +229,6 @@ func (s *reportService) Update(
 		req.Description,
 		req.CategoryID,
 		req.LocationID,
-		req.OccurredAt,
 	); err != nil {
 		return nil, err
 	}
@@ -152,7 +242,7 @@ func (s *reportService) Update(
 		return nil, fmt.Errorf("find report before update: %w", err)
 	}
 
-	if report.UserID != uid {
+	if report.UserID != uid && role != "admin" {
 		return nil, ErrReportForbidden
 	}
 
@@ -172,7 +262,20 @@ func (s *reportService) Update(
 		return nil, fmt.Errorf("update report: %w", err)
 	}
 
-	response := report.ToResponse()
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(
+		ctx,
+		reportID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find updated report detail: %w", err)
+	}
+
+	response := buildReportResponse(
+		report,
+		user,
+		categoryName,
+		locationName,
+	)
 
 	return &response, nil
 }
@@ -180,6 +283,7 @@ func (s *reportService) Update(
 func (s *reportService) Delete(
 	ctx context.Context,
 	userID string,
+	role string,
 	id string,
 ) error {
 	uid, err := uuid.Parse(userID)
@@ -201,7 +305,7 @@ func (s *reportService) Delete(
 		return fmt.Errorf("find report before delete: %w", err)
 	}
 
-	if report.UserID != uid {
+	if report.UserID != uid && role != "admin" {
 		return ErrReportForbidden
 	}
 
@@ -220,30 +324,48 @@ func validateReport(
 	reportType string,
 	title string,
 	description string,
-	categoryID int64,
-	locationID int64,
-	occurredAt time.Time,
+	categoryID int,
+	locationID int,
 ) error {
 	reportType = strings.ToLower(strings.TrimSpace(reportType))
 
 	if reportType != "lost" && reportType != "found" {
 		return ErrReportValidation
 	}
+
 	if strings.TrimSpace(title) == "" {
 		return ErrReportValidation
 	}
+
 	if strings.TrimSpace(description) == "" {
 		return ErrReportValidation
 	}
+
 	if categoryID <= 0 {
 		return ErrReportValidation
 	}
+
 	if locationID <= 0 {
-		return ErrReportValidation
-	}
-	if occurredAt.IsZero() {
 		return ErrReportValidation
 	}
 
 	return nil
+}
+
+func buildReportResponse(
+	report *model.Report,
+	user *model.ReportUserBrief,
+	categoryName string,
+	locationName string,
+) model.ReportResponse {
+	response := report.ToResponse()
+
+	response.CategoryName = categoryName
+	response.LocationName = locationName
+
+	if user != nil {
+		response.User = *user
+	}
+
+	return response
 }

@@ -56,6 +56,10 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, expiresIn)
 	authHandler := handler.NewAuthHandler(authSvc)
 
+	reportRepo := repository.NewReportRepository(pool)
+	reportSvc := service.NewReportService(reportRepo)
+	reportHandler := handler.NewReportHandler(reportSvc)
+
 	r := chi.NewRouter()
 
 	r.Use(chimiddleware.Logger)
@@ -81,6 +85,26 @@ func main() {
 		r.Post("/auth/login", authHandler.Login)
 
 		r.With(middleware.JWTAuth(cfg.JWTSecret)).Get("/auth/me", authHandler.Me)
+
+		r.Route("/reports", func(r chi.Router) {
+			r.Get("/", reportHandler.List)
+			r.Get("/{id}", reportHandler.GetByID)
+
+			r.With(middleware.JWTAuth(cfg.JWTSecret)).Post(
+				"/",
+				reportHandler.Create,
+			)
+
+			r.With(middleware.JWTAuth(cfg.JWTSecret)).Put(
+				"/{id}",
+				reportHandler.Update,
+			)
+
+			r.With(middleware.JWTAuth(cfg.JWTSecret)).Delete(
+				"/{id}",
+				reportHandler.Delete,
+			)
+		})
 	})
 
 	server := &http.Server{

@@ -25,7 +25,6 @@ export function useReports(query: ListReportsQuery) {
                 if (value === undefined || value === null || value === "") {
                     return;
                 }
-
                 params.set(key, String(value));
             });
 
@@ -34,13 +33,7 @@ export function useReports(query: ListReportsQuery) {
                 ? `/api/reports?${queryString}`
                 : "/api/reports";
 
-            const response = await api.get<PaginatedReports>(url);
-
-            if (!response) {
-                throw new Error("Data laporan tidak ditemukan");
-            }
-
-            return response;
+            return api.get<PaginatedReports>(url);
         },
         staleTime: 30 * 1000,
         placeholderData: keepPreviousData,
@@ -50,15 +43,7 @@ export function useReports(query: ListReportsQuery) {
 export function useReport(id: string) {
     return useQuery({
         queryKey: ["report", id],
-        queryFn: async () => {
-            const response = await api.get<Report>(`/api/reports/${id}`);
-
-            if (!response) {
-                throw new Error("Laporan tidak ditemukan");
-            }
-
-            return response;
-        },
+        queryFn: () => api.get<Report>(`/api/reports/${id}`),
         enabled: !!id,
     });
 }
@@ -70,9 +55,7 @@ export function useCreateReport() {
         mutationFn: (data: CreateReportRequest) =>
             api.post<Report>("/api/reports", data),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({
-                queryKey: ["reports"],
-            });
+            await queryClient.invalidateQueries({ queryKey: ["reports"] });
         },
     });
 }
@@ -87,7 +70,6 @@ export function useMyReports(query: ListReportsQuery) {
                 if (value === undefined || value === null || value === "") {
                     return;
                 }
-
                 params.set(key, String(value));
             });
 
@@ -96,13 +78,7 @@ export function useMyReports(query: ListReportsQuery) {
                 ? `/api/reports/me?${queryString}`
                 : "/api/reports/me";
 
-            const response = await api.get<PaginatedReports>(url);
-
-            if (!response) {
-                throw new Error("Data laporan saya tidak ditemukan");
-            }
-
-            return response;
+            return api.get<PaginatedReports>(url);
         },
         staleTime: 30 * 1000,
         placeholderData: keepPreviousData,
@@ -113,11 +89,9 @@ export function useDeleteReport() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: string) => api.delete<void>(`/api/reports/${id}`),
+        mutationFn: (id: string) => api.delete(`/api/reports/${id}`),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({
-                queryKey: ["reports"],
-            });
+            await queryClient.invalidateQueries({ queryKey: ["reports"] });
             await queryClient.invalidateQueries({
                 queryKey: ["admin", "reports"],
             });

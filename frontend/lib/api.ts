@@ -19,7 +19,7 @@ async function request<T>(
     method: string,
     path: string,
     body?: unknown,
-): Promise<T | undefined> {
+): Promise<T> {
     const headers = new Headers();
 
     if (body !== undefined) {
@@ -69,7 +69,7 @@ async function request<T>(
     }
 
     if (response.status === 204) {
-        return undefined;
+        return undefined as T;
     }
 
     try {
@@ -84,23 +84,23 @@ async function request<T>(
 }
 
 export const api = {
-    get<T>(path: string) {
+    get<T>(path: string): Promise<T> {
         return request<T>("GET", path);
     },
 
-    post<T>(path: string, body?: unknown) {
+    post<T>(path: string, body?: unknown): Promise<T> {
         return request<T>("POST", path, body);
     },
 
-    put<T>(path: string, body?: unknown) {
+    put<T>(path: string, body?: unknown): Promise<T> {
         return request<T>("PUT", path, body);
     },
 
-    delete<T>(path: string) {
-        return request<T>("DELETE", path);
+    patch<T>(path: string, body?: unknown): Promise<T> {
+        return request<T>("PATCH", path, body);
     },
 
-    patch<T>(path: string, body?: unknown) {
-        return request<T>("PATCH", path, body);
+    delete<T = void>(path: string): Promise<T> {
+        return request<T>("DELETE", path);
     },
 };

@@ -80,15 +80,9 @@ export function useUpdateClaimStatus() {
             return data as Claim;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: ["admin", "claims"],
-            });
-            queryClient.invalidateQueries({
-                queryKey: ["claims"],
-            });
-            queryClient.invalidateQueries({
-                queryKey: ["reports"],
-            });
+            queryClient.invalidateQueries({ queryKey: ["admin", "claims"] });
+            queryClient.invalidateQueries({ queryKey: ["claims"] });
+            queryClient.invalidateQueries({ queryKey: ["reports"] });
         },
     });
 }
@@ -96,7 +90,7 @@ export function useUpdateClaimStatus() {
 export function useAdminReports(query: ListReportsQuery) {
     return useQuery<PaginatedReports>({
         queryKey: ["admin", "reports", query],
-        queryFn: () => {
+        queryFn: async () => {
             const params = new URLSearchParams();
 
             if (query.page !== undefined) {
@@ -128,10 +122,11 @@ export function useAdminReports(query: ListReportsQuery) {
             }
 
             const queryString = params.toString();
+            const url = queryString
+                ? `/api/reports?${queryString}`
+                : "/api/reports";
 
-            return api.get<PaginatedReports>(
-                queryString ? `/api/reports?${queryString}` : "/api/reports",
-            );
+            return api.get<PaginatedReports>(url);
         },
         staleTime: 30_000,
     });

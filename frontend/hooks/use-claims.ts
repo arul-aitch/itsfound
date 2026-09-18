@@ -16,10 +16,8 @@ export function useCreateClaim() {
             await queryClient.invalidateQueries({
                 queryKey: ["report", variables.report_id],
             });
-
-            await queryClient.invalidateQueries({
-                queryKey: ["reports"],
-            });
+            await queryClient.invalidateQueries({ queryKey: ["reports"] });
+            await queryClient.invalidateQueries({ queryKey: ["claims"] });
         },
     });
 }
@@ -27,15 +25,7 @@ export function useCreateClaim() {
 export function useMyClaims() {
     return useQuery({
         queryKey: ["claims", "me"],
-        queryFn: async () => {
-            const response = await api.get<Claim[]>("/api/claims/me");
-
-            if (!response) {
-                throw new Error("Data klaim tidak ditemukan");
-            }
-
-            return response;
-        },
+        queryFn: () => api.get<Claim[]>("/api/claims/me"),
         enabled: isAuthenticated(),
     });
 }

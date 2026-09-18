@@ -38,6 +38,12 @@ type ClaimRepository interface {
 		claimantID uuid.UUID,
 	) (int, error)
 
+	CountPendingByReport(
+		ctx context.Context,
+		reportID uuid.UUID,
+		excludeClaimID uuid.UUID,
+	) (int, error)
+
 	UpdateStatus(
 		ctx context.Context,
 		id uuid.UUID,
@@ -365,6 +371,33 @@ func (r *postgresClaimRepository) CountByReportAndClaimant(
 		claimantID,
 	).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count claims: %w", err)
+	}
+
+	return count, nil
+}
+
+func (r *postgresClaimRepository) CountPendingByReport(
+	ctx context.Context,
+	reportID uuid.UUID,
+	excludeClaimID uuid.UUID,
+) (int, error) {
+	const query = `
+		SELECT COUNT(*)
+		FROM claims
+		WHERE report_id = $1
+		  AND status = 'pending'
+		  AND id != $2
+	`
+
+	var count int
+
+	if err := r.pool.QueryRow(
+		ctx,
+		query,
+		reportID,
+		excludeClaimID,
+	).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count pending claims: %w", err)
 	}
 
 	return count, nil

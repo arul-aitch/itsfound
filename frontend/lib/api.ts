@@ -99,4 +99,8 @@ export const api = {
     delete<T>(path: string) {
         return request<T>("DELETE", path);
     },
+
+    patch<T>(path: string, body?: unknown) {
+        return request<T>("PATCH", path, body);
+    },
 };

@@ -1,7 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Claim, ListReportsQuery, PaginatedReports } from "@/lib/types";
+import type {
+    Claim,
+    ListReportsQuery,
+    PaginatedReports,
+    Report,
+} from "@/lib/types";
 import { api, ApiClientError } from "@/lib/api";
 import { getToken, isAuthenticated } from "@/lib/auth";
 
@@ -129,5 +134,24 @@ export function useAdminReports(query: ListReportsQuery) {
             );
         },
         staleTime: 30_000,
+    });
+}
+
+export function useAdminUpdateReportStatus() {
+    const queryClient = useQueryClient();
+
+    return useMutation<
+        Report,
+        ApiClientError,
+        { id: string; status: "open" | "in_claim" | "resolved" | "removed" }
+    >({
+        mutationFn: ({ id, status }) =>
+            api.patch<Report>(`/api/reports/${id}/status`, { status }),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["admin", "reports"],
+            });
+            await queryClient.invalidateQueries({ queryKey: ["reports"] });
+        },
     });
 }

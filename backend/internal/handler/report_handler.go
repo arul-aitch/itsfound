@@ -18,56 +18,31 @@ type ReportHandler struct {
 }
 
 func NewReportHandler(svc service.ReportService) *ReportHandler {
-	return &ReportHandler{
-		svc: svc,
-	}
+	return &ReportHandler{svc: svc}
 }
 
 func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(
-			w,
-			http.StatusUnauthorized,
-			"UNAUTHORIZED",
-			"unauthorized",
-		)
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
 		return
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	var req model.CreateReportRequest
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"VALIDATION_ERROR",
-			"invalid request body",
-		)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
 
 	report, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrReportValidation):
-			writeError(
-				w,
-				http.StatusBadRequest,
-				"VALIDATION_ERROR",
-				"invalid report data",
-			)
-		default:
-			writeError(
-				w,
-				http.StatusInternalServerError,
-				"INTERNAL_ERROR",
-				"internal server error",
-			)
+		if errors.Is(err, service.ErrReportValidation) {
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid report data")
+			return
 		}
-
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
@@ -79,12 +54,7 @@ func (h *ReportHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	reports, err := h.svc.List(r.Context(), listQuery)
 	if err != nil {
-		writeError(
-			w,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"internal server error",
-		)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
@@ -94,29 +64,15 @@ func (h *ReportHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(
-			w,
-			http.StatusUnauthorized,
-			"UNAUTHORIZED",
-			"unauthorized",
-		)
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
 		return
 	}
 
 	listQuery := parseReportsQuery(r)
 
-	reports, err := h.svc.ListMine(
-		r.Context(),
-		userID,
-		listQuery,
-	)
+	reports, err := h.svc.ListMine(r.Context(), userID, listQuery)
 	if err != nil {
-		writeError(
-			w,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"internal server error",
-		)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
 
@@ -130,28 +86,12 @@ func (h *ReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportValidation):
-			writeError(
-				w,
-				http.StatusBadRequest,
-				"VALIDATION_ERROR",
-				"invalid report id",
-			)
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid report id")
 		case errors.Is(err, repository.ErrNotFound):
-			writeError(
-				w,
-				http.StatusNotFound,
-				"NOT_FOUND",
-				"report not found",
-			)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "report not found")
 		default:
-			writeError(
-				w,
-				http.StatusInternalServerError,
-				"INTERNAL_ERROR",
-				"internal server error",
-			)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		}
-
 		return
 	}
 
@@ -161,75 +101,73 @@ func (h *ReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(
-			w,
-			http.StatusUnauthorized,
-			"UNAUTHORIZED",
-			"unauthorized",
-		)
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
 		return
 	}
 
+	role, _ := middleware.RoleFromContext(r.Context())
+	id := chi.URLParam(r, "id")
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var req model.UpdateReportRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
+		return
+	}
+
+	report, err := h.svc.Update(r.Context(), userID, role, id, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrReportValidation):
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid report data")
+		case errors.Is(err, service.ErrReportForbidden):
+			writeError(w, http.StatusForbidden, "FORBIDDEN", "you are not allowed to modify this report")
+		case errors.Is(err, repository.ErrNotFound):
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "report not found")
+		default:
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, report)
+}
+
+// UpdateStatus — admin only. Body: { "status": "removed" | "open" | ... }
+type updateReportStatusRequest struct {
+	Status string `json:"status"`
+}
+
+func (h *ReportHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	role, ok := middleware.RoleFromContext(r.Context())
-	if !ok {
-		role = ""
+	if !ok || role != "admin" {
+		writeError(w, http.StatusForbidden, "FORBIDDEN", "admin access required")
+		return
 	}
 
 	id := chi.URLParam(r, "id")
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
-	var req model.UpdateReportRequest
-
+	var req updateReportStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(
-			w,
-			http.StatusBadRequest,
-			"VALIDATION_ERROR",
-			"invalid request body",
-		)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid request body")
 		return
 	}
 
-	report, err := h.svc.Update(
-		r.Context(),
-		userID,
-		role,
-		id,
-		req,
-	)
+	report, err := h.svc.UpdateStatus(r.Context(), role, id, req.Status)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportValidation):
-			writeError(
-				w,
-				http.StatusBadRequest,
-				"VALIDATION_ERROR",
-				"invalid report data",
-			)
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid status")
 		case errors.Is(err, service.ErrReportForbidden):
-			writeError(
-				w,
-				http.StatusForbidden,
-				"FORBIDDEN",
-				"you are not allowed to modify this report",
-			)
+			writeError(w, http.StatusForbidden, "FORBIDDEN", "forbidden")
 		case errors.Is(err, repository.ErrNotFound):
-			writeError(
-				w,
-				http.StatusNotFound,
-				"NOT_FOUND",
-				"report not found",
-			)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "report not found")
 		default:
-			writeError(
-				w,
-				http.StatusInternalServerError,
-				"INTERNAL_ERROR",
-				"internal server error",
-			)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		}
-
 		return
 	}
 
@@ -239,60 +177,24 @@ func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(
-			w,
-			http.StatusUnauthorized,
-			"UNAUTHORIZED",
-			"unauthorized",
-		)
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
 		return
 	}
 
-	role, ok := middleware.RoleFromContext(r.Context())
-	if !ok {
-		role = ""
-	}
-
+	role, _ := middleware.RoleFromContext(r.Context())
 	id := chi.URLParam(r, "id")
 
-	err := h.svc.Delete(
-		r.Context(),
-		userID,
-		role,
-		id,
-	)
-	if err != nil {
+	if err := h.svc.Delete(r.Context(), userID, role, id); err != nil {
 		switch {
 		case errors.Is(err, service.ErrReportValidation):
-			writeError(
-				w,
-				http.StatusBadRequest,
-				"VALIDATION_ERROR",
-				"invalid report id",
-			)
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid report id")
 		case errors.Is(err, service.ErrReportForbidden):
-			writeError(
-				w,
-				http.StatusForbidden,
-				"FORBIDDEN",
-				"you are not allowed to delete this report",
-			)
+			writeError(w, http.StatusForbidden, "FORBIDDEN", "you are not allowed to delete this report")
 		case errors.Is(err, repository.ErrNotFound):
-			writeError(
-				w,
-				http.StatusNotFound,
-				"NOT_FOUND",
-				"report not found",
-			)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "report not found")
 		default:
-			writeError(
-				w,
-				http.StatusInternalServerError,
-				"INTERNAL_ERROR",
-				"internal server error",
-			)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		}
-
 		return
 	}
 

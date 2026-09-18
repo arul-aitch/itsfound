@@ -229,21 +229,8 @@ func (s *claimService) UpdateStatus(
 		return nil, fmt.Errorf("update claim status: %w", err)
 	}
 
-	if status == "approved" {
-		report, err := s.reportRepo.FindByID(ctx, claim.ReportID)
-		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrClaimNotFound
-			}
-
-			return nil, fmt.Errorf("find report for approval: %w", err)
-		}
-
-		report.Status = "resolved"
-
-		if err := s.reportRepo.Update(ctx, report); err != nil {
-			return nil, fmt.Errorf("resolve report after claim approval: %w", err)
-		}
+	if err := s.syncReportStatus(ctx, claim, status, claimUUID); err != nil {
+		return nil, err
 	}
 
 	claim, claimant, report, err := s.claimRepo.FindByIDWithDetail(
@@ -265,6 +252,56 @@ func (s *claimService) UpdateStatus(
 	)
 
 	return &response, nil
+}
+
+// syncReportStatus menyesuaikan status report berdasarkan hasil review claim.
+//   - approved  -> report.Status = "resolved"
+//   - rejected  -> kalau tidak ada claim pending lain, revert ke "open";
+//     kalau masih ada, biarkan "in_claim"
+func (s *claimService) syncReportStatus(
+	ctx context.Context,
+	claim *model.Claim,
+	newStatus string,
+	excludeClaimID uuid.UUID,
+) error {
+	report, err := s.reportRepo.FindByID(ctx, claim.ReportID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrClaimNotFound
+		}
+
+		return fmt.Errorf("find report for sync: %w", err)
+	}
+
+	switch newStatus {
+	case "approved":
+		report.Status = "resolved"
+
+	case "rejected":
+		pending, err := s.claimRepo.CountPendingByReport(
+			ctx,
+			claim.ReportID,
+			excludeClaimID,
+		)
+		if err != nil {
+			return fmt.Errorf("count pending claims: %w", err)
+		}
+
+		if pending == 0 {
+			report.Status = "open"
+		} else {
+			report.Status = "in_claim"
+		}
+
+	default:
+		return ErrInvalidClaimStatus
+	}
+
+	if err := s.reportRepo.Update(ctx, report); err != nil {
+		return fmt.Errorf("sync report status: %w", err)
+	}
+
+	return nil
 }
 
 func buildClaimResponse(

@@ -101,6 +101,11 @@ func main() {
 				reportHandler.ListMine,
 			)
 
+			r.With(middleware.JWTAuth(cfg.JWTSecret)).Patch(
+				"/{id}/status",
+				reportHandler.UpdateStatus,
+			)
+
 			r.Get("/{id}", reportHandler.GetByID)
 
 			r.With(middleware.JWTAuth(cfg.JWTSecret)).Post(

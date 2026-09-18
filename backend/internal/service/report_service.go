@@ -17,42 +17,13 @@ var (
 )
 
 type ReportService interface {
-	Create(
-		ctx context.Context,
-		userID string,
-		req model.CreateReportRequest,
-	) (*model.ReportResponse, error)
-
-	GetByID(
-		ctx context.Context,
-		id string,
-	) (*model.ReportResponse, error)
-
-	List(
-		ctx context.Context,
-		q model.ListReportsQuery,
-	) (*model.PaginatedReports, error)
-
-	ListMine(
-		ctx context.Context,
-		userID string,
-		q model.ListReportsQuery,
-	) (*model.PaginatedReports, error)
-
-	Update(
-		ctx context.Context,
-		userID string,
-		role string,
-		id string,
-		req model.UpdateReportRequest,
-	) (*model.ReportResponse, error)
-
-	Delete(
-		ctx context.Context,
-		userID string,
-		role string,
-		id string,
-	) error
+	Create(ctx context.Context, userID string, req model.CreateReportRequest) (*model.ReportResponse, error)
+	GetByID(ctx context.Context, id string) (*model.ReportResponse, error)
+	List(ctx context.Context, q model.ListReportsQuery) (*model.PaginatedReports, error)
+	ListMine(ctx context.Context, userID string, q model.ListReportsQuery) (*model.PaginatedReports, error)
+	Update(ctx context.Context, userID string, role string, id string, req model.UpdateReportRequest) (*model.ReportResponse, error)
+	UpdateStatus(ctx context.Context, role string, id string, status string) (*model.ReportResponse, error)
+	Delete(ctx context.Context, userID string, role string, id string) error
 }
 
 type reportService struct {
@@ -60,9 +31,7 @@ type reportService struct {
 }
 
 func NewReportService(repo repository.ReportRepository) ReportService {
-	return &reportService{
-		repo: repo,
-	}
+	return &reportService{repo: repo}
 }
 
 func (s *reportService) Create(
@@ -75,13 +44,7 @@ func (s *reportService) Create(
 		return nil, fmt.Errorf("parse user id: %w", err)
 	}
 
-	if err := validateReport(
-		req.Type,
-		req.Title,
-		req.Description,
-		req.CategoryID,
-		req.LocationID,
-	); err != nil {
+	if err := validateReport(req.Type, req.Title, req.Description, req.CategoryID, req.LocationID); err != nil {
 		return nil, err
 	}
 
@@ -100,42 +63,26 @@ func (s *reportService) Create(
 		return nil, fmt.Errorf("create report: %w", err)
 	}
 
-	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(
-		ctx,
-		report.ID,
-	)
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(ctx, report.ID)
 	if err != nil {
 		return nil, fmt.Errorf("find created report detail: %w", err)
 	}
 
-	response := buildReportResponse(
-		report,
-		user,
-		categoryName,
-		locationName,
-	)
-
+	response := buildReportResponse(report, user, categoryName, locationName)
 	return &response, nil
 }
 
-func (s *reportService) GetByID(
-	ctx context.Context,
-	id string,
-) (*model.ReportResponse, error) {
+func (s *reportService) GetByID(ctx context.Context, id string) (*model.ReportResponse, error) {
 	reportID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, ErrReportValidation
 	}
 
-	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(
-		ctx,
-		reportID,
-	)
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(ctx, reportID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, repository.ErrNotFound
 		}
-
 		return nil, fmt.Errorf("find report detail: %w", err)
 	}
 
@@ -143,45 +90,22 @@ func (s *reportService) GetByID(
 		return nil, repository.ErrNotFound
 	}
 
-	response := buildReportResponse(
-		report,
-		user,
-		categoryName,
-		locationName,
-	)
-
+	response := buildReportResponse(report, user, categoryName, locationName)
 	return &response, nil
 }
 
-func (s *reportService) List(
-	ctx context.Context,
-	q model.ListReportsQuery,
-) (*model.PaginatedReports, error) {
+func (s *reportService) List(ctx context.Context, q model.ListReportsQuery) (*model.PaginatedReports, error) {
 	q = sanitizeListQuery(q)
 
-	reports, users, categoryNames, locationNames, total, err := s.repo.List(
-		ctx,
-		q,
-	)
+	reports, users, categoryNames, locationNames, total, err := s.repo.List(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("list reports: %w", err)
 	}
 
-	return buildPaginatedReports(
-		reports,
-		users,
-		categoryNames,
-		locationNames,
-		q,
-		total,
-	), nil
+	return buildPaginatedReports(reports, users, categoryNames, locationNames, q, total), nil
 }
 
-func (s *reportService) ListMine(
-	ctx context.Context,
-	userID string,
-	q model.ListReportsQuery,
-) (*model.PaginatedReports, error) {
+func (s *reportService) ListMine(ctx context.Context, userID string, q model.ListReportsQuery) (*model.PaginatedReports, error) {
 	uid, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, fmt.Errorf("parse user id: %w", err)
@@ -189,23 +113,12 @@ func (s *reportService) ListMine(
 
 	q = sanitizeListQuery(q)
 
-	reports, users, categoryNames, locationNames, total, err := s.repo.ListByUser(
-		ctx,
-		uid,
-		q,
-	)
+	reports, users, categoryNames, locationNames, total, err := s.repo.ListByUser(ctx, uid, q)
 	if err != nil {
 		return nil, fmt.Errorf("list user reports: %w", err)
 	}
 
-	return buildPaginatedReports(
-		reports,
-		users,
-		categoryNames,
-		locationNames,
-		q,
-		total,
-	), nil
+	return buildPaginatedReports(reports, users, categoryNames, locationNames, q, total), nil
 }
 
 func (s *reportService) Update(
@@ -225,13 +138,7 @@ func (s *reportService) Update(
 		return nil, ErrReportValidation
 	}
 
-	if err := validateReport(
-		req.Type,
-		req.Title,
-		req.Description,
-		req.CategoryID,
-		req.LocationID,
-	); err != nil {
+	if err := validateReport(req.Type, req.Title, req.Description, req.CategoryID, req.LocationID); err != nil {
 		return nil, err
 	}
 
@@ -240,7 +147,6 @@ func (s *reportService) Update(
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, repository.ErrNotFound
 		}
-
 		return nil, fmt.Errorf("find report before update: %w", err)
 	}
 
@@ -260,34 +166,70 @@ func (s *reportService) Update(
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, repository.ErrNotFound
 		}
-
 		return nil, fmt.Errorf("update report: %w", err)
 	}
 
-	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(
-		ctx,
-		reportID,
-	)
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(ctx, reportID)
 	if err != nil {
 		return nil, fmt.Errorf("find updated report detail: %w", err)
 	}
 
-	response := buildReportResponse(
-		report,
-		user,
-		categoryName,
-		locationName,
-	)
-
+	response := buildReportResponse(report, user, categoryName, locationName)
 	return &response, nil
 }
 
-func (s *reportService) Delete(
+// UpdateStatus — khusus admin. Mengubah status report tanpa field lain.
+// Dipakai untuk soft delete (status = "removed") dan modulasi lain.
+func (s *reportService) UpdateStatus(
 	ctx context.Context,
-	userID string,
 	role string,
 	id string,
-) error {
+	status string,
+) (*model.ReportResponse, error) {
+	if role != "admin" {
+		return nil, ErrReportForbidden
+	}
+
+	reportID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, ErrReportValidation
+	}
+
+	status = strings.ToLower(strings.TrimSpace(status))
+
+	switch status {
+	case "open", "in_claim", "resolved", "removed":
+	default:
+		return nil, ErrReportValidation
+	}
+
+	report, err := s.repo.FindByID(ctx, reportID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("find report before status update: %w", err)
+	}
+
+	report.Status = status
+
+	if err := s.repo.Update(ctx, report); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("update report status: %w", err)
+	}
+
+	report, user, categoryName, locationName, err := s.repo.FindByIDWithDetail(ctx, reportID)
+	if err != nil {
+		return nil, fmt.Errorf("find updated report detail: %w", err)
+	}
+
+	response := buildReportResponse(report, user, categoryName, locationName)
+	return &response, nil
+}
+
+func (s *reportService) Delete(ctx context.Context, userID string, role string, id string) error {
 	uid, err := uuid.Parse(userID)
 	if err != nil {
 		return fmt.Errorf("parse user id: %w", err)
@@ -303,7 +245,6 @@ func (s *reportService) Delete(
 		if errors.Is(err, repository.ErrNotFound) {
 			return repository.ErrNotFound
 		}
-
 		return fmt.Errorf("find report before delete: %w", err)
 	}
 
@@ -315,38 +256,27 @@ func (s *reportService) Delete(
 		if errors.Is(err, repository.ErrNotFound) {
 			return repository.ErrNotFound
 		}
-
 		return fmt.Errorf("delete report: %w", err)
 	}
 
 	return nil
 }
 
-func validateReport(
-	reportType string,
-	title string,
-	description string,
-	categoryID int,
-	locationID int,
-) error {
+func validateReport(reportType, title, description string, categoryID, locationID int) error {
 	reportType = strings.ToLower(strings.TrimSpace(reportType))
 
 	if reportType != "lost" && reportType != "found" {
 		return ErrReportValidation
 	}
-
 	if strings.TrimSpace(title) == "" {
 		return ErrReportValidation
 	}
-
 	if strings.TrimSpace(description) == "" {
 		return ErrReportValidation
 	}
-
 	if categoryID <= 0 {
 		return ErrReportValidation
 	}
-
 	if locationID <= 0 {
 		return ErrReportValidation
 	}
@@ -358,17 +288,14 @@ func sanitizeListQuery(q model.ListReportsQuery) model.ListReportsQuery {
 	if q.Page < 1 {
 		q.Page = 1
 	}
-
 	if q.PerPage < 1 {
 		q.PerPage = 20
 	}
-
 	if q.PerPage > 100 {
 		q.PerPage = 100
 	}
 
 	q.Type = strings.ToLower(strings.TrimSpace(q.Type))
-
 	if q.Type != "" && q.Type != "lost" && q.Type != "found" {
 		q.Type = ""
 	}
@@ -397,24 +324,14 @@ func buildPaginatedReports(
 		if i < len(users) {
 			user = users[i]
 		}
-
 		if i < len(categoryNames) {
 			categoryName = categoryNames[i]
 		}
-
 		if i < len(locationNames) {
 			locationName = locationNames[i]
 		}
 
-		data = append(
-			data,
-			buildReportResponse(
-				report,
-				user,
-				categoryName,
-				locationName,
-			),
-		)
+		data = append(data, buildReportResponse(report, user, categoryName, locationName))
 	}
 
 	totalPages := (total + q.PerPage - 1) / q.PerPage
@@ -437,13 +354,10 @@ func buildReportResponse(
 	locationName string,
 ) model.ReportResponse {
 	response := report.ToResponse()
-
 	response.CategoryName = categoryName
 	response.LocationName = locationName
-
 	if user != nil {
 		response.User = *user
 	}
-
 	return response
 }

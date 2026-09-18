@@ -118,6 +118,9 @@ export function useDeleteReport() {
             await queryClient.invalidateQueries({
                 queryKey: ["reports"],
             });
+            await queryClient.invalidateQueries({
+                queryKey: ["admin", "reports"],
+            });
         },
     });
 }

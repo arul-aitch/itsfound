@@ -96,21 +96,10 @@ func (r *postgresReportRepository) FindByIDWithDetail(
 ) (*model.Report, *model.ReportUserBrief, string, string, error) {
 	const query = `
 		SELECT
-			r.id,
-			r.user_id,
-			r.category_id,
-			r.location_id,
-			r.type,
-			r.title,
-			r.description,
-			r.photo_url,
-			r.status,
-			r.occurred_at,
-			r.created_at,
-			r.updated_at,
-			u.id,
-			u.name,
-			u.wa_number,
+			r.id, r.user_id, r.category_id, r.location_id, r.type, r.title,
+			r.description, r.photo_url, r.status, r.occurred_at,
+			r.created_at, r.updated_at,
+			u.id, u.name, u.wa_number,
 			c.name AS category_name,
 			l.name AS location_name
 		FROM reports r
@@ -126,29 +115,16 @@ func (r *postgresReportRepository) FindByIDWithDetail(
 	var locationName string
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&report.ID,
-		&report.UserID,
-		&report.CategoryID,
-		&report.LocationID,
-		&report.Type,
-		&report.Title,
-		&report.Description,
-		&report.PhotoURL,
-		&report.Status,
-		&report.OccurredAt,
-		&report.CreatedAt,
-		&report.UpdatedAt,
-		&user.ID,
-		&user.Name,
-		&user.WANumber,
-		&categoryName,
-		&locationName,
+		&report.ID, &report.UserID, &report.CategoryID, &report.LocationID,
+		&report.Type, &report.Title, &report.Description, &report.PhotoURL,
+		&report.Status, &report.OccurredAt, &report.CreatedAt, &report.UpdatedAt,
+		&user.ID, &user.Name, &user.WANumber,
+		&categoryName, &locationName,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil, "", "", ErrNotFound
 		}
-
 		return nil, nil, "", "", fmt.Errorf("find report with detail: %w", err)
 	}
 
@@ -169,11 +145,15 @@ func (r *postgresReportRepository) List(
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	if q.Status != "removed" {
+	// Status filter logic:
+	// - "" (kosong)         → default publik: exclude removed
+	// - "removed"           → hanya removed (untuk admin)
+	// - "open"/"in_claim"/"resolved" → filter status tsb, exclude removed
+	if q.Status == "" {
 		where.WriteString(" AND r.status != 'removed'")
-	}
-
-	if q.Status != "" && q.Status != "removed" {
+	} else if q.Status == "removed" {
+		where.WriteString(" AND r.status = 'removed'")
+	} else {
 		placeholder := addArg(q.Status)
 		where.WriteString(" AND r.status = " + placeholder)
 	}
@@ -224,21 +204,10 @@ func (r *postgresReportRepository) List(
 
 	query := `
 		SELECT
-			r.id,
-			r.user_id,
-			r.category_id,
-			r.location_id,
-			r.type,
-			r.title,
-			r.description,
-			r.photo_url,
-			r.status,
-			r.occurred_at,
-			r.created_at,
-			r.updated_at,
-			u.id,
-			u.name,
-			u.wa_number,
+			r.id, r.user_id, r.category_id, r.location_id, r.type, r.title,
+			r.description, r.photo_url, r.status, r.occurred_at,
+			r.created_at, r.updated_at,
+			u.id, u.name, u.wa_number,
 			c.name AS category_name,
 			l.name AS location_name
 		FROM reports r
@@ -268,23 +237,11 @@ func (r *postgresReportRepository) List(
 		var locationName string
 
 		if err := rows.Scan(
-			&report.ID,
-			&report.UserID,
-			&report.CategoryID,
-			&report.LocationID,
-			&report.Type,
-			&report.Title,
-			&report.Description,
-			&report.PhotoURL,
-			&report.Status,
-			&report.OccurredAt,
-			&report.CreatedAt,
-			&report.UpdatedAt,
-			&user.ID,
-			&user.Name,
-			&user.WANumber,
-			&categoryName,
-			&locationName,
+			&report.ID, &report.UserID, &report.CategoryID, &report.LocationID,
+			&report.Type, &report.Title, &report.Description, &report.PhotoURL,
+			&report.Status, &report.OccurredAt, &report.CreatedAt, &report.UpdatedAt,
+			&user.ID, &user.Name, &user.WANumber,
+			&categoryName, &locationName,
 		); err != nil {
 			return nil, nil, nil, nil, 0, fmt.Errorf("scan report: %w", err)
 		}
@@ -368,21 +325,10 @@ func (r *postgresReportRepository) ListByUser(
 
 	query := `
 		SELECT
-			r.id,
-			r.user_id,
-			r.category_id,
-			r.location_id,
-			r.type,
-			r.title,
-			r.description,
-			r.photo_url,
-			r.status,
-			r.occurred_at,
-			r.created_at,
-			r.updated_at,
-			u.id,
-			u.name,
-			u.wa_number,
+			r.id, r.user_id, r.category_id, r.location_id, r.type, r.title,
+			r.description, r.photo_url, r.status, r.occurred_at,
+			r.created_at, r.updated_at,
+			u.id, u.name, u.wa_number,
 			c.name AS category_name,
 			l.name AS location_name
 		FROM reports r
@@ -412,23 +358,11 @@ func (r *postgresReportRepository) ListByUser(
 		var locationName string
 
 		if err := rows.Scan(
-			&report.ID,
-			&report.UserID,
-			&report.CategoryID,
-			&report.LocationID,
-			&report.Type,
-			&report.Title,
-			&report.Description,
-			&report.PhotoURL,
-			&report.Status,
-			&report.OccurredAt,
-			&report.CreatedAt,
-			&report.UpdatedAt,
-			&user.ID,
-			&user.Name,
-			&user.WANumber,
-			&categoryName,
-			&locationName,
+			&report.ID, &report.UserID, &report.CategoryID, &report.LocationID,
+			&report.Type, &report.Title, &report.Description, &report.PhotoURL,
+			&report.Status, &report.OccurredAt, &report.CreatedAt, &report.UpdatedAt,
+			&user.ID, &user.Name, &user.WANumber,
+			&categoryName, &locationName,
 		); err != nil {
 			return nil, nil, nil, nil, 0, fmt.Errorf("scan user report: %w", err)
 		}
@@ -452,18 +386,8 @@ func (r *postgresReportRepository) FindByID(
 ) (*model.Report, error) {
 	const query = `
 		SELECT
-			id,
-			user_id,
-			category_id,
-			location_id,
-			type,
-			title,
-			description,
-			photo_url,
-			status,
-			occurred_at,
-			created_at,
-			updated_at
+			id, user_id, category_id, location_id, type, title, description,
+			photo_url, status, occurred_at, created_at, updated_at
 		FROM reports
 		WHERE id = $1
 	`
@@ -471,24 +395,14 @@ func (r *postgresReportRepository) FindByID(
 	report := &model.Report{}
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&report.ID,
-		&report.UserID,
-		&report.CategoryID,
-		&report.LocationID,
-		&report.Type,
-		&report.Title,
-		&report.Description,
-		&report.PhotoURL,
-		&report.Status,
-		&report.OccurredAt,
-		&report.CreatedAt,
-		&report.UpdatedAt,
+		&report.ID, &report.UserID, &report.CategoryID, &report.LocationID,
+		&report.Type, &report.Title, &report.Description, &report.PhotoURL,
+		&report.Status, &report.OccurredAt, &report.CreatedAt, &report.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-
 		return nil, fmt.Errorf("find report by id: %w", err)
 	}
 
@@ -532,7 +446,6 @@ func (r *postgresReportRepository) Update(
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
-
 		return fmt.Errorf("update report: %w", err)
 	}
 
@@ -543,10 +456,7 @@ func (r *postgresReportRepository) Delete(
 	ctx context.Context,
 	id uuid.UUID,
 ) error {
-	const query = `
-		DELETE FROM reports
-		WHERE id = $1
-	`
+	const query = `DELETE FROM reports WHERE id = $1`
 
 	result, err := r.pool.Exec(ctx, query, id)
 	if err != nil {

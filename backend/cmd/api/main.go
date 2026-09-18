@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -202,22 +201,12 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		allowed := false
-
-		if origin == "http://localhost:3000" {
-			allowed = true
+		allowedOrigins := map[string]bool{
+			"http://localhost:3000":       true,
+			"https://itsfound.vercel.app": true,
 		}
 
-		if origin == "https://itsfound.vercel.app" {
-			allowed = true
-		}
-
-		if strings.HasPrefix(origin, "https://itsfound-") &&
-			strings.HasSuffix(origin, ".vercel.app") {
-			allowed = true
-		}
-
-		if allowed {
+		if allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set(
 				"Access-Control-Allow-Methods",
@@ -231,7 +220,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		if r.Method == http.MethodOptions {
-			if allowed {
+			if allowedOrigins[origin] {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}

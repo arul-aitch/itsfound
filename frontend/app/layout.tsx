@@ -1,31 +1,37 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
+
+import { Navbar } from "@/components/navbar";
+import { Toaster } from "@/components/ui/sonner";
+import { Providers } from "@/app/providers";
+
 import "./globals.css";
-import { Providers } from "./providers";
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
-    subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
+const plusJakartaSans = Plus_Jakarta_Sans({
+    variable: "--font-sans",
     subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
     title: "ITSFOUND",
-    description: "Barang hilang? Cek ITSFOUND dulu.",
+    description: "Lost & found kampus ITS",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+    children,
+}: Readonly<{
+    children: React.ReactNode;
+}>) {
     return (
-        <html
-            lang="id"
-            className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-        >
-            <body className="min-h-full flex flex-col">
-                <Providers>{children}</Providers>
+        <html lang="id">
+            <body
+                className={`${plusJakartaSans.variable} font-sans text-[15px] antialiased`}
+            >
+                <Providers>
+                    <Navbar />
+                    <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+                    <Toaster />
+                </Providers>
             </body>
         </html>
     );

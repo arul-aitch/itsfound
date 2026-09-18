@@ -1,18 +1,27 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, PackageCheck, PackageX } from "lucide-react";
+import {
+    ArrowLeft,
+    Loader2,
+    PackageCheck,
+    PackageX,
+    Upload,
+    X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { useMe } from "@/hooks/use-auth";
 import { useCreateReport } from "@/hooks/use-reports";
 import { ApiClientError } from "@/lib/api";
 import { CATEGORIES, LOCATIONS } from "@/lib/constants";
+import { uploadPhoto } from "@/lib/supabase";
 import type { CreateReportRequest } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
@@ -48,6 +57,10 @@ export default function NewReportPage() {
     const { data: user, isLoading: isUserLoading } = useMe();
     const createReport = useCreateReport();
 
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+
     const {
         register,
         handleSubmit,
@@ -76,7 +89,53 @@ export default function NewReportPage() {
         }
     }, [isUserLoading, user, router]);
 
-    const onSubmit = (values: ReportFormValues) => {
+    useEffect(() => {
+        return () => {
+            if (photoPreview) {
+                URL.revokeObjectURL(photoPreview);
+            }
+        };
+    }, [photoPreview]);
+
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        if (!file.type.startsWith("image/")) {
+            toast.error("File harus berupa gambar");
+            event.currentTarget.value = "";
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Ukuran file maksimal 5MB");
+            event.currentTarget.value = "";
+            return;
+        }
+
+        if (photoPreview) {
+            URL.revokeObjectURL(photoPreview);
+        }
+
+        setPhotoFile(file);
+        setPhotoPreview(URL.createObjectURL(file));
+
+        event.currentTarget.value = "";
+    };
+
+    const handleRemovePhoto = () => {
+        if (photoPreview) {
+            URL.revokeObjectURL(photoPreview);
+        }
+
+        setPhotoFile(null);
+        setPhotoPreview(null);
+    };
+
+    const onSubmit = async (values: ReportFormValues) => {
         if (!user) {
             return;
         }
@@ -88,6 +147,27 @@ export default function NewReportPage() {
             return;
         }
 
+        let photoUrl: string | null = null;
+
+        if (photoFile) {
+            setIsUploading(true);
+
+            try {
+                photoUrl = await uploadPhoto(photoFile);
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal mengunggah foto";
+
+                toast.error(message);
+                setIsUploading(false);
+                return;
+            }
+
+            setIsUploading(false);
+        }
+
         const payload: CreateReportRequest = {
             type: values.type,
             title: values.title,
@@ -95,6 +175,7 @@ export default function NewReportPage() {
             category_id: values.category_id,
             location_id: values.location_id,
             occurred_at: occurredAt.toISOString(),
+            photo_url: photoUrl ?? undefined,
         };
 
         createReport.mutate(payload, {
@@ -141,6 +222,7 @@ export default function NewReportPage() {
                         <div className="h-24 animate-pulse rounded-lg bg-muted" />
                         <div className="h-20 animate-pulse rounded-lg bg-muted" />
                         <div className="h-32 animate-pulse rounded-lg bg-muted" />
+                        <div className="h-52 animate-pulse rounded-lg bg-muted" />
                         <div className="h-20 animate-pulse rounded-lg bg-muted" />
                         <div className="h-20 animate-pulse rounded-lg bg-muted" />
                     </div>
@@ -249,6 +331,62 @@ export default function NewReportPage() {
                     )}
                 </div>
 
+                <div className="space-y-2">
+                    <Label>Foto Barang (opsional)</Label>
+
+                    {photoPreview ? (
+                        <div className="relative aspect-video overflow-hidden rounded-lg border">
+                            <Image
+                                src={photoPreview}
+                                alt="Preview"
+                                fill
+                                className="object-cover"
+                            />
+
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="destructive"
+                                className="absolute right-2 top-2"
+                                onClick={handleRemovePhoto}
+                                aria-label="Hapus foto"
+                            >
+                                <X size={16} />
+                            </Button>
+                        </div>
+                    ) : (
+                        <label
+                            htmlFor="photo"
+                            className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed hover:border-primary/50 hover:bg-muted/30"
+                        >
+                            <Upload
+                                size={32}
+                                className="text-muted-foreground"
+                            />
+
+                            <span className="text-sm text-muted-foreground">
+                                Klik untuk pilih foto
+                            </span>
+
+                            <span className="text-xs text-muted-foreground">
+                                PNG, JPG, atau WebP. Maks 5MB.
+                            </span>
+
+                            <Input
+                                type="file"
+                                id="photo"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileSelect}
+                            />
+                        </label>
+                    )}
+
+                    <p className="text-xs text-muted-foreground">
+                        Foto membantu orang lain mengenali barang.
+                    </p>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                         <Label>Kategori *</Label>
@@ -353,9 +491,18 @@ export default function NewReportPage() {
                 <Button
                     type="submit"
                     className="h-12 w-full font-semibold"
-                    disabled={createReport.isPending}
+                    disabled={createReport.isPending || isUploading}
                 >
-                    {createReport.isPending ? "Membuat..." : "Buat Laporan"}
+                    {isUploading ? (
+                        <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Mengunggah foto...
+                        </>
+                    ) : createReport.isPending ? (
+                        "Membuat..."
+                    ) : (
+                        "Buat Laporan"
+                    )}
                 </Button>
             </form>
         </div>

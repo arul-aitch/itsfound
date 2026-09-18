@@ -95,6 +95,12 @@ func main() {
 
 		r.Route("/reports", func(r chi.Router) {
 			r.Get("/", reportHandler.List)
+
+			r.With(middleware.JWTAuth(cfg.JWTSecret)).Get(
+				"/me",
+				reportHandler.ListMine,
+			)
+
 			r.Get("/{id}", reportHandler.GetByID)
 
 			r.With(middleware.JWTAuth(cfg.JWTSecret)).Post(

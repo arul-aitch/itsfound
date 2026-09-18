@@ -86,7 +86,7 @@ func (s *claimService) Create(
 		return nil, fmt.Errorf("find report for claim: %w", err)
 	}
 
-		if report.Type != "found" {
+	if report.Type != "found" {
 		return nil, ErrReportNotClaimable
 	}
 
@@ -110,7 +110,7 @@ func (s *claimService) Create(
 	if report.Status != "open" {
 		return nil, ErrReportNotClaimable
 	}
-	
+
 	claim := &model.Claim{
 		ReportID:   req.ReportID,
 		ClaimantID: claimantUUID,

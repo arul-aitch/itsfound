@@ -33,6 +33,12 @@ type ReportService interface {
 		q model.ListReportsQuery,
 	) (*model.PaginatedReports, error)
 
+	ListMine(
+		ctx context.Context,
+		userID string,
+		q model.ListReportsQuery,
+	) (*model.PaginatedReports, error)
+
 	Update(
 		ctx context.Context,
 		userID string,
@@ -151,26 +157,7 @@ func (s *reportService) List(
 	ctx context.Context,
 	q model.ListReportsQuery,
 ) (*model.PaginatedReports, error) {
-	if q.Page < 1 {
-		q.Page = 1
-	}
-
-	if q.PerPage < 1 {
-		q.PerPage = 20
-	}
-
-	if q.PerPage > 100 {
-		q.PerPage = 100
-	}
-
-	q.Type = strings.ToLower(strings.TrimSpace(q.Type))
-
-	if q.Type != "" && q.Type != "lost" && q.Type != "found" {
-		q.Type = ""
-	}
-
-	q.Search = strings.TrimSpace(q.Search)
-	q.Status = strings.TrimSpace(q.Status)
+	q = sanitizeListQuery(q)
 
 	reports, users, categoryNames, locationNames, total, err := s.repo.List(
 		ctx,
@@ -180,30 +167,45 @@ func (s *reportService) List(
 		return nil, fmt.Errorf("list reports: %w", err)
 	}
 
-	data := make([]model.ReportResponse, 0, len(reports))
+	return buildPaginatedReports(
+		reports,
+		users,
+		categoryNames,
+		locationNames,
+		q,
+		total,
+	), nil
+}
 
-	for i, report := range reports {
-		response := buildReportResponse(
-			report,
-			users[i],
-			categoryNames[i],
-			locationNames[i],
-		)
-
-		data = append(data, response)
+func (s *reportService) ListMine(
+	ctx context.Context,
+	userID string,
+	q model.ListReportsQuery,
+) (*model.PaginatedReports, error) {
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("parse user id: %w", err)
 	}
 
-	totalPages := (total + q.PerPage - 1) / q.PerPage
+	q = sanitizeListQuery(q)
 
-	return &model.PaginatedReports{
-		Data: data,
-		Meta: model.PaginationMeta{
-			Page:       q.Page,
-			PerPage:    q.PerPage,
-			Total:      total,
-			TotalPages: totalPages,
-		},
-	}, nil
+	reports, users, categoryNames, locationNames, total, err := s.repo.ListByUser(
+		ctx,
+		uid,
+		q,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list user reports: %w", err)
+	}
+
+	return buildPaginatedReports(
+		reports,
+		users,
+		categoryNames,
+		locationNames,
+		q,
+		total,
+	), nil
 }
 
 func (s *reportService) Update(
@@ -350,6 +352,82 @@ func validateReport(
 	}
 
 	return nil
+}
+
+func sanitizeListQuery(q model.ListReportsQuery) model.ListReportsQuery {
+	if q.Page < 1 {
+		q.Page = 1
+	}
+
+	if q.PerPage < 1 {
+		q.PerPage = 20
+	}
+
+	if q.PerPage > 100 {
+		q.PerPage = 100
+	}
+
+	q.Type = strings.ToLower(strings.TrimSpace(q.Type))
+
+	if q.Type != "" && q.Type != "lost" && q.Type != "found" {
+		q.Type = ""
+	}
+
+	q.Search = strings.TrimSpace(q.Search)
+	q.Status = strings.TrimSpace(q.Status)
+
+	return q
+}
+
+func buildPaginatedReports(
+	reports []*model.Report,
+	users []*model.ReportUserBrief,
+	categoryNames []string,
+	locationNames []string,
+	q model.ListReportsQuery,
+	total int,
+) *model.PaginatedReports {
+	data := make([]model.ReportResponse, 0, len(reports))
+
+	for i, report := range reports {
+		var user *model.ReportUserBrief
+		var categoryName string
+		var locationName string
+
+		if i < len(users) {
+			user = users[i]
+		}
+
+		if i < len(categoryNames) {
+			categoryName = categoryNames[i]
+		}
+
+		if i < len(locationNames) {
+			locationName = locationNames[i]
+		}
+
+		data = append(
+			data,
+			buildReportResponse(
+				report,
+				user,
+				categoryName,
+				locationName,
+			),
+		)
+	}
+
+	totalPages := (total + q.PerPage - 1) / q.PerPage
+
+	return &model.PaginatedReports{
+		Data: data,
+		Meta: model.PaginationMeta{
+			Page:       q.Page,
+			PerPage:    q.PerPage,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+	}
 }
 
 func buildReportResponse(

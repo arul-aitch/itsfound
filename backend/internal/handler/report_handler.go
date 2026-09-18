@@ -26,7 +26,12 @@ func NewReportHandler(svc service.ReportService) *ReportHandler {
 func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
+		writeError(
+			w,
+			http.StatusUnauthorized,
+			"UNAUTHORIZED",
+			"unauthorized",
+		)
 		return
 	}
 
@@ -70,41 +75,41 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ReportHandler) List(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-
-	listQuery := model.ListReportsQuery{
-		Page:    0,
-		PerPage: 0,
-		Type:    query.Get("type"),
-		Status:  query.Get("status"),
-		Search:  query.Get("search"),
-	}
-
-	if value := query.Get("page"); value != "" {
-		if page, err := strconv.Atoi(value); err == nil {
-			listQuery.Page = page
-		}
-	}
-
-	if value := query.Get("per_page"); value != "" {
-		if perPage, err := strconv.Atoi(value); err == nil {
-			listQuery.PerPage = perPage
-		}
-	}
-
-	if value := query.Get("category_id"); value != "" {
-		if categoryID, err := strconv.Atoi(value); err == nil {
-			listQuery.CategoryID = &categoryID
-		}
-	}
-
-	if value := query.Get("location_id"); value != "" {
-		if locationID, err := strconv.Atoi(value); err == nil {
-			listQuery.LocationID = &locationID
-		}
-	}
+	listQuery := parseReportsQuery(r)
 
 	reports, err := h.svc.List(r.Context(), listQuery)
+	if err != nil {
+		writeError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, reports)
+}
+
+func (h *ReportHandler) ListMine(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		writeError(
+			w,
+			http.StatusUnauthorized,
+			"UNAUTHORIZED",
+			"unauthorized",
+		)
+		return
+	}
+
+	listQuery := parseReportsQuery(r)
+
+	reports, err := h.svc.ListMine(
+		r.Context(),
+		userID,
+		listQuery,
+	)
 	if err != nil {
 		writeError(
 			w,
@@ -156,7 +161,12 @@ func (h *ReportHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
+		writeError(
+			w,
+			http.StatusUnauthorized,
+			"UNAUTHORIZED",
+			"unauthorized",
+		)
 		return
 	}
 
@@ -229,7 +239,12 @@ func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
+		writeError(
+			w,
+			http.StatusUnauthorized,
+			"UNAUTHORIZED",
+			"unauthorized",
+		)
 		return
 	}
 
@@ -282,4 +297,42 @@ func (h *ReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseReportsQuery(r *http.Request) model.ListReportsQuery {
+	query := r.URL.Query()
+
+	listQuery := model.ListReportsQuery{
+		Page:    0,
+		PerPage: 0,
+		Type:    query.Get("type"),
+		Status:  query.Get("status"),
+		Search:  query.Get("search"),
+	}
+
+	if value := query.Get("page"); value != "" {
+		if page, err := strconv.Atoi(value); err == nil {
+			listQuery.Page = page
+		}
+	}
+
+	if value := query.Get("per_page"); value != "" {
+		if perPage, err := strconv.Atoi(value); err == nil {
+			listQuery.PerPage = perPage
+		}
+	}
+
+	if value := query.Get("category_id"); value != "" {
+		if categoryID, err := strconv.Atoi(value); err == nil {
+			listQuery.CategoryID = &categoryID
+		}
+	}
+
+	if value := query.Get("location_id"); value != "" {
+		if locationID, err := strconv.Atoi(value); err == nil {
+			listQuery.LocationID = &locationID
+		}
+	}
+
+	return listQuery
 }

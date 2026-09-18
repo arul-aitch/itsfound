@@ -76,3 +76,48 @@ export function useCreateReport() {
         },
     });
 }
+
+export function useMyReports(query: ListReportsQuery) {
+    return useQuery({
+        queryKey: ["reports", "me", query],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+
+            Object.entries(query).forEach(([key, value]) => {
+                if (value === undefined || value === null || value === "") {
+                    return;
+                }
+
+                params.set(key, String(value));
+            });
+
+            const queryString = params.toString();
+            const url = queryString
+                ? `/api/reports/me?${queryString}`
+                : "/api/reports/me";
+
+            const response = await api.get<PaginatedReports>(url);
+
+            if (!response) {
+                throw new Error("Data laporan saya tidak ditemukan");
+            }
+
+            return response;
+        },
+        staleTime: 30 * 1000,
+        placeholderData: keepPreviousData,
+    });
+}
+
+export function useDeleteReport() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => api.delete<void>(`/api/reports/${id}`),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["reports"],
+            });
+        },
+    });
+}

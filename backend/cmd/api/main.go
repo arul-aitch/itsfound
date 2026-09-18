@@ -60,6 +60,10 @@ func main() {
 	reportSvc := service.NewReportService(reportRepo)
 	reportHandler := handler.NewReportHandler(reportSvc)
 
+	claimRepo := repository.NewClaimRepository(pool)
+	claimSvc := service.NewClaimService(claimRepo, reportRepo)
+	claimHandler := handler.NewClaimHandler(claimSvc)
+
 	r := chi.NewRouter()
 
 	r.Use(chimiddleware.Logger)
@@ -84,7 +88,10 @@ func main() {
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)
 
-		r.With(middleware.JWTAuth(cfg.JWTSecret)).Get("/auth/me", authHandler.Me)
+		r.With(middleware.JWTAuth(cfg.JWTSecret)).Get(
+			"/auth/me",
+			authHandler.Me,
+		)
 
 		r.Route("/reports", func(r chi.Router) {
 			r.Get("/", reportHandler.List)
@@ -105,6 +112,26 @@ func main() {
 				reportHandler.Delete,
 			)
 		})
+
+		r.With(middleware.JWTAuth(cfg.JWTSecret)).Post(
+			"/claims",
+			claimHandler.Create,
+		)
+
+		r.With(middleware.JWTAuth(cfg.JWTSecret)).Get(
+			"/claims/me",
+			claimHandler.ListMine,
+		)
+
+		r.With(middleware.JWTAuth(cfg.JWTSecret)).Get(
+			"/admin/claims",
+			claimHandler.ListAll,
+		)
+
+		r.With(middleware.JWTAuth(cfg.JWTSecret)).Patch(
+			"/admin/claims/{id}",
+			claimHandler.UpdateStatus,
+		)
 	})
 
 	server := &http.Server{
@@ -113,13 +140,23 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
 	defer stop()
 
 	serverErr := make(chan error, 1)
 
 	go func() {
-		slog.Info("server started", "port", cfg.Port, "environment", cfg.AppEnv)
+		slog.Info(
+			"server started",
+			"port",
+			cfg.Port,
+			"environment",
+			cfg.AppEnv,
+		)
 
 		serverErr <- server.ListenAndServe()
 	}()
@@ -134,7 +171,10 @@ func main() {
 	case <-ctx.Done():
 		slog.Info("shutdown signal received")
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -152,8 +192,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		if origin == "http://localhost:3000" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set(
+				"Access-Control-Allow-Methods",
+				"GET, POST, PUT, PATCH, DELETE, OPTIONS",
+			)
+			w.Header().Set(
+				"Access-Control-Allow-Headers",
+				"Content-Type, Authorization",
+			)
 			w.Header().Set("Vary", "Origin")
 		}
 

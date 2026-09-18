@@ -362,6 +362,7 @@ func (r *postgresReportRepository) Update(
 			description = $6,
 			photo_url = $7,
 			occurred_at = $8,
+			status = $9,
 			updated_at = NOW()
 		WHERE id = $1
 		RETURNING updated_at
@@ -378,6 +379,7 @@ func (r *postgresReportRepository) Update(
 		report.Description,
 		report.PhotoURL,
 		report.OccurredAt,
+		report.Status,
 	).Scan(&report.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

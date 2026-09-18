@@ -4,17 +4,25 @@ import Link from "next/link";
 import { useState } from "react";
 import { Search } from "lucide-react";
 
+import { useReports } from "@/hooks/use-reports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ReportCard } from "@/components/report-card";
 
 export default function HomePage() {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<"all" | "lost" | "found">("all");
 
+    const { data, isLoading, isError } = useReports({
+        per_page: 6,
+        type: filter === "all" ? undefined : filter,
+        search: search || undefined,
+    });
+
     return (
         <div>
-            <section className="border-b bg-gradient-to-b from-primary/20 via-primary/10 to-background">
+            <section className="border-b bg-gradient-to-b from-primary/15 via-primary/5 to-background">
                 <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:py-24">
                     <h1 className="text-3xl font-bold leading-[1.1] tracking-tight sm:text-5xl">
                         Barang hilang? Cek ITSFOUND dulu.
@@ -83,25 +91,53 @@ export default function HomePage() {
                     </Link>
                 </div>
 
-                <div className="rounded-xl border">
-                    <div className="flex min-h-60 flex-col items-center justify-center px-6 py-10 text-center">
-                        <div className="rounded-full bg-muted p-5">
-                            <Search
-                                size={32}
-                                strokeWidth={1.5}
-                                className="text-muted-foreground"
+                {isLoading ? (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="h-72 animate-pulse rounded-xl bg-muted"
                             />
-                        </div>
-
-                        <p className="mt-5 font-medium">
-                            Fitur laporan segera hadir
-                        </p>
-
+                        ))}
+                    </div>
+                ) : isError ? (
+                    <div className="rounded-xl border border-dashed p-10 text-center">
+                        <p className="font-medium">Gagal memuat laporan</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Laporan terbaru akan tampil di sini.
+                            Coba refresh halaman.
                         </p>
                     </div>
-                </div>
+                ) : !data || data.data.length === 0 ? (
+                    <div className="rounded-xl border border-dashed">
+                        <div className="flex min-h-60 flex-col items-center justify-center px-6 py-10 text-center">
+                            <div className="rounded-full bg-muted p-5">
+                                <Search
+                                    size={32}
+                                    strokeWidth={1.5}
+                                    className="text-muted-foreground"
+                                />
+                            </div>
+
+                            <p className="mt-5 font-medium">
+                                {search
+                                    ? `Tidak ada hasil untuk "${search}"`
+                                    : "Belum ada laporan"}
+                            </p>
+
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {search
+                                    ? "Coba kata kunci lain atau ubah filter."
+                                    : "Jadilah yang pertama melaporkan barang hilang atau temuan."}
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {data.data.map((report) => (
+                            <ReportCard key={report.id} report={report} />
+                        ))}
+                    </div>
+                )}
             </section>
 
             <section className="mx-auto max-w-5xl px-4 pb-12 sm:px-6 lg:px-8">

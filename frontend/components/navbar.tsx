@@ -19,6 +19,7 @@ export function Navbar() {
     const { logout } = useLogout();
 
     const isLoggedIn = !isLoading && !!user;
+    const isAdmin = isLoggedIn && user?.role === "admin";
 
     return (
         <header className="sticky top-0 z-40 border-b bg-background/80 shadow-xs backdrop-blur-sm">
@@ -47,6 +48,15 @@ export function Navbar() {
                             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                         >
                             Dashboard
+                        </Link>
+                    )}
+
+                    {isAdmin && (
+                        <Link
+                            href="/admin"
+                            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            Admin
                         </Link>
                     )}
                 </div>
@@ -116,6 +126,15 @@ export function Navbar() {
                                         className="rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
                                     >
                                         Dashboard
+                                    </Link>
+                                )}
+
+                                {isAdmin && (
+                                    <Link
+                                        href="/admin"
+                                        className="rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                                    >
+                                        Admin
                                     </Link>
                                 )}
 

@@ -201,7 +201,12 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		if origin == "http://localhost:3000" {
+		allowedOrigins := map[string]bool{
+			"http://localhost:3000":       true,
+			"https://itsfound.vercel.app": true,
+		}
+
+		if allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set(
 				"Access-Control-Allow-Methods",
@@ -215,7 +220,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		if r.Method == http.MethodOptions {
-			if origin == "http://localhost:3000" {
+			if allowedOrigins[origin] {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}

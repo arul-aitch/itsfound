@@ -6,12 +6,19 @@ export interface DecodedToken {
     exp: number;
 }
 
+function emitAuthChange() {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("auth-change"));
+    }
+}
+
 export function saveToken(token: string) {
     if (typeof window === "undefined") {
         return;
     }
 
     window.localStorage.setItem(TOKEN_KEY, token);
+    emitAuthChange();
 }
 
 export function getToken(): string | null {
@@ -28,6 +35,7 @@ export function removeToken() {
     }
 
     window.localStorage.removeItem(TOKEN_KEY);
+    emitAuthChange();
 }
 
 export function decodeToken(token: string): DecodedToken | null {

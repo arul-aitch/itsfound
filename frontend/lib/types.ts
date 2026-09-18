@@ -74,6 +74,16 @@ export interface LoginResponse {
     token: string;
 }
 
+export interface CreateReportRequest {
+    type: ReportType;
+    title: string;
+    description: string;
+    category_id: number;
+    location_id: number;
+    occurred_at: string;
+    photo_url?: string | null;
+}
+
 export interface ApiError {
     error: {
         code: string;

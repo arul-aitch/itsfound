@@ -1,9 +1,19 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+    keepPreviousData,
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
-import type { ListReportsQuery, PaginatedReports, Report } from "@/lib/types";
+import type {
+    CreateReportRequest,
+    ListReportsQuery,
+    PaginatedReports,
+    Report,
+} from "@/lib/types";
 
 export function useReports(query: ListReportsQuery) {
     return useQuery({
@@ -50,5 +60,19 @@ export function useReport(id: string) {
             return response;
         },
         enabled: !!id,
+    });
+}
+
+export function useCreateReport() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: CreateReportRequest) =>
+            api.post<Report>("/api/reports", data),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["reports"],
+            });
+        },
     });
 }

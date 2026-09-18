@@ -130,13 +130,9 @@ export function ReportDetail({ report }: ReportDetailProps) {
                 </CardContent>
             </Card>
 
-            <div className="sticky bottom-4 z-10 flex flex-col gap-3 pt-2 sm:static sm:flex-row">
+            <div className="sticky bottom-4 z-10 grid grid-cols-1 gap-3 pt-2 sm:static sm:grid-cols-2">
                 {report.user.wa_number ? (
-                    <Button
-                        asChild
-                        size="lg"
-                        className="w-full font-semibold sm:flex-1"
-                    >
+                    <Button asChild className="h-12 w-full font-semibold">
                         <a
                             href={whatsappURL}
                             target="_blank"
@@ -150,7 +146,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
                     <Button
                         disabled
                         variant="secondary"
-                        className="h-12     w-full font-semibold sm:flex-1"
+                        className="h-12 w-full font-semibold"
                     >
                         <MessageCircle size={18} />
                         Kontak tidak tersedia
@@ -159,7 +155,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
 
                 <Button
                     variant="outline"
-                    className="h-12 w-full font-semibold sm:flex-1"
+                    className="h-12 w-full font-semibold"
                     onClick={() => toast.info("Fitur klaim segera hadir")}
                 >
                     Ajukan Klaim

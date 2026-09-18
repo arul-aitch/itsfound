@@ -31,3 +31,13 @@ export function formatRelativeTime(dateString: string): string {
         year: "numeric",
     }).format(date);
 }
+
+export function formatDateTime(dateString: string): string {
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    }).format(new Date(dateString));
+}

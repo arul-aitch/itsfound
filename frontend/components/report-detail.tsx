@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Clock, ImageIcon, MapPin, MessageCircle } from "lucide-react";
-import { toast } from "sonner";
 
+import { useMe } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { ClaimDialog } from "@/components/claim-dialog";
 import { ReportStatusBadge } from "@/components/report-status-badge";
 import { ReportTypeBadge } from "@/components/report-type-badge";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
@@ -32,6 +34,9 @@ function normalizeWANumber(waNumber: string): string {
 }
 
 export function ReportDetail({ report }: ReportDetailProps) {
+    const router = useRouter();
+    const { data: user } = useMe();
+
     const initial = report.user.name.trim().charAt(0).toUpperCase() || "U";
 
     const whatsappNumber = report.user.wa_number
@@ -43,6 +48,91 @@ export function ReportDetail({ report }: ReportDetailProps) {
     const whatsappURL = whatsappNumber
         ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
         : "";
+
+    const isOwner = !!user && report.user_id === user.id;
+    const isLoggedIn = !!user;
+
+    const renderClaimAction = () => {
+        if (report.status === "removed") {
+            return null;
+        }
+
+        if (report.type !== "found") {
+            return (
+                <div className="flex w-full flex-1 flex-col">
+                    <Button disabled variant="outline" className="w-full">
+                        Ajukan Klaim
+                    </Button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                        Hanya barang temuan yang bisa diklaim.
+                    </p>
+                </div>
+            );
+        }
+
+        if (report.status === "in_claim") {
+            return (
+                <div className="flex w-full flex-1 flex-col">
+                    <Button disabled variant="outline" className="w-full">
+                        Sedang Diklaim
+                    </Button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                        Laporan ini sedang dalam proses klaim.
+                    </p>
+                </div>
+            );
+        }
+
+        if (report.status === "resolved") {
+            return (
+                <div className="flex w-full flex-1 flex-col">
+                    <Button disabled variant="outline" className="w-full">
+                        Sudah Selesai
+                    </Button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                        Laporan ini sudah selesai.
+                    </p>
+                </div>
+            );
+        }
+
+        if (!isLoggedIn) {
+            return (
+                <div className="flex w-full flex-1 flex-col">
+                    <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => router.push("/login")}
+                    >
+                        Login untuk Klaim
+                    </Button>
+                </div>
+            );
+        }
+
+        if (isOwner) {
+            return (
+                <div className="flex w-full flex-1 flex-col">
+                    <Button disabled variant="outline" className="w-full">
+                        Laporan Milikmu
+                    </Button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                        Kamu tidak bisa mengklaim laporan milik sendiri.
+                    </p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex w-full flex-1 flex-col">
+                <ClaimDialog report={report}>
+                    <Button variant="outline" className="w-full">
+                        Ajukan Klaim
+                    </Button>
+                </ClaimDialog>
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -130,36 +220,26 @@ export function ReportDetail({ report }: ReportDetailProps) {
                 </CardContent>
             </Card>
 
-            <div className="sticky bottom-4 z-10 grid grid-cols-1 gap-3 pt-2 sm:static sm:grid-cols-2">
+            <div className="sticky bottom-4 z-10 flex flex-col gap-3 pt-2 sm:static sm:flex-row">
                 {report.user.wa_number ? (
-                    <Button asChild className="h-12 w-full font-semibold">
+                    <Button asChild className="w-full sm:flex-1">
                         <a
                             href={whatsappURL}
                             target="_blank"
                             rel="noopener noreferrer"
                         >
-                            <MessageCircle size={18} />
+                            <MessageCircle size={16} />
                             Hubungi via WhatsApp
                         </a>
                     </Button>
                 ) : (
-                    <Button
-                        disabled
-                        variant="secondary"
-                        className="h-12 w-full font-semibold"
-                    >
-                        <MessageCircle size={18} />
+                    <Button disabled className="w-full sm:flex-1">
+                        <MessageCircle size={16} />
                         Kontak tidak tersedia
                     </Button>
                 )}
 
-                <Button
-                    variant="outline"
-                    className="h-12 w-full font-semibold"
-                    onClick={() => toast.info("Fitur klaim segera hadir")}
-                >
-                    Ajukan Klaim
-                </Button>
+                {renderClaimAction()}
             </div>
         </div>
     );

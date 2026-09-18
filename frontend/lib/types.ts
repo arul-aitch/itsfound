@@ -1,6 +1,7 @@
 export type UserRole = "user" | "admin";
 export type ReportType = "lost" | "found";
 export type ReportStatus = "open" | "in_claim" | "resolved" | "removed";
+export type ClaimStatus = "pending" | "approved" | "rejected";
 
 export interface User {
     id: string;
@@ -82,6 +83,37 @@ export interface CreateReportRequest {
     location_id: number;
     occurred_at: string;
     photo_url?: string | null;
+}
+
+export interface CreateClaimRequest {
+    report_id: string;
+    evidence: string;
+}
+
+export interface ClaimantBrief {
+    id: string;
+    name: string;
+    wa_number: string | null;
+}
+
+export interface ClaimReportBrief {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+}
+
+export interface Claim {
+    id: string;
+    report_id: string;
+    claimant_id: string;
+    evidence: string;
+    status: ClaimStatus;
+    admin_note: string | null;
+    created_at: string;
+    updated_at: string;
+    claimant: ClaimantBrief;
+    report: ClaimReportBrief;
 }
 
 export interface ApiError {

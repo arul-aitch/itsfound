@@ -60,7 +60,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
         if (report.type !== "found") {
             return (
                 <div className="flex w-full flex-1 flex-col">
-                    <Button disabled variant="outline" className="w-full">
+                    <Button disabled variant="outline" className="h-12 w-full">
                         Ajukan Klaim
                     </Button>
                     <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -73,7 +73,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
         if (report.status === "in_claim") {
             return (
                 <div className="flex w-full flex-1 flex-col">
-                    <Button disabled variant="outline" className="w-full">
+                    <Button disabled variant="outline" className="h-12 w-full">
                         Sedang Diklaim
                     </Button>
                     <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -86,7 +86,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
         if (report.status === "resolved") {
             return (
                 <div className="flex w-full flex-1 flex-col">
-                    <Button disabled variant="outline" className="w-full">
+                    <Button disabled variant="outline" className="h-12 w-full">
                         Sudah Selesai
                     </Button>
                     <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -101,7 +101,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
                 <div className="flex w-full flex-1 flex-col">
                     <Button
                         variant="outline"
-                        className="w-full"
+                        className="h-12 w-full"
                         onClick={() => router.push("/login")}
                     >
                         Login untuk Klaim
@@ -113,7 +113,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
         if (isOwner) {
             return (
                 <div className="flex w-full flex-1 flex-col">
-                    <Button disabled variant="outline" className="w-full">
+                    <Button disabled variant="outline" className="h-12 w-full">
                         Laporan Milikmu
                     </Button>
                     <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -126,7 +126,7 @@ export function ReportDetail({ report }: ReportDetailProps) {
         return (
             <div className="flex w-full flex-1 flex-col">
                 <ClaimDialog report={report}>
-                    <Button variant="outline" className="w-full">
+                    <Button variant="outline" className="h-12 w-full">
                         Ajukan Klaim
                     </Button>
                 </ClaimDialog>
@@ -222,19 +222,26 @@ export function ReportDetail({ report }: ReportDetailProps) {
 
             <div className="sticky bottom-4 z-10 flex flex-col gap-3 pt-2 sm:static sm:flex-row">
                 {report.user.wa_number ? (
-                    <Button asChild className="w-full sm:flex-1">
+                    <Button
+                        asChild
+                        className="h-12 w-full font-semibold sm:flex-1"
+                    >
                         <a
                             href={whatsappURL}
                             target="_blank"
                             rel="noopener noreferrer"
                         >
-                            <MessageCircle size={16} />
+                            <MessageCircle size={18} />
                             Hubungi via WhatsApp
                         </a>
                     </Button>
                 ) : (
-                    <Button disabled className="w-full sm:flex-1">
-                        <MessageCircle size={16} />
+                    <Button
+                        disabled
+                        variant="secondary"
+                        className="h-12 w-full font-semibold sm:flex-1"
+                    >
+                        <MessageCircle size={18} />
                         Kontak tidak tersedia
                     </Button>
                 )}
